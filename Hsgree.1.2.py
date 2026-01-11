@@ -3,7 +3,6 @@ import pickle
 import os
 import altair as alt
 import pandas as pd
-from datetime import datetime
 
 # Configuração da página
 st.set_page_config(
@@ -32,7 +31,7 @@ if "history" not in st.session_state:
 if "custom_strategies" not in st.session_state:
     st.session_state.custom_strategies = []
 
-# CSS - Histórico horizontal reforçado (uma linha única)
+# CSS - Histórico horizontal único (forçado para não quebrar)
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
@@ -78,7 +77,14 @@ body { background: radial-gradient(circle at top, #0f2027, #203a43, #2c5364); }
 .blue { background: linear-gradient(145deg, #1e90ff, #003d80); }
 .yellow { background: linear-gradient(145deg, #ffcc00, #cc9a00); color: #000; }
 
-.warning-box { background: rgba(255,68,68,0.15); border: 1px solid #ff4444; border-radius: 12px; padding: 16px; margin: 20px 0; color: #ffdddd; }
+.warning-box {
+    background: rgba(255,68,68,0.15);
+    border: 1px solid #ff4444;
+    border-radius: 12px;
+    padding: 16px;
+    margin: 20px 0;
+    color: #ffdddd;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -88,7 +94,7 @@ st.markdown('<div class="subtitle">Análise Inteligente • Padrões Reais 2026 
 
 st.warning("⚠️ **AVISO**: Apostas envolvem risco financeiro alto. Jogue apenas com dinheiro que pode perder. Proibido para menores de 18 anos.")
 
-# SIDEBAR - Configurações e Estratégias Personalizadas
+# SIDEBAR
 with st.sidebar:
     st.header("Configurações Profissionais")
     
@@ -114,7 +120,7 @@ with st.sidebar:
 # FUNÇÕES AUXILIARES
 def add_result(value):
     st.session_state.history.insert(0, value)
-    st.session_state.history = st.session_state.history[:500]  # Aumentado para mais análise
+    st.session_state.history = st.session_state.history[:500]
     save_history(st.session_state.history)
 
 def undo():
@@ -147,7 +153,7 @@ def backtest_pattern(history, pattern, suggestion):
                 hits += 1
     return (hits / total * 100) if total > 0 else None
 
-# DETECÇÃO DE PADRÕES AVANÇADA (todos os 18 + Green Sinais + imagens)
+# DETECÇÃO DE PADRÕES - COMPLETA E AVANÇADA
 def detect_patterns(history):
     if len(history) < 3:
         return None, 0, "", None
@@ -155,16 +161,17 @@ def detect_patterns(history):
     recent = history[:20]  # Aumentado para capturar padrões longos
     patterns = []
 
-    # Padrões do Green Sinais (oficiais)
+    # Padrões oficiais do Green Sinais
     patterns.extend([
         (["B"]*4, "🔴 Casa", 94, "Quebra 4 Azuis - Muito usado"),
         (["R"]*4, "🔵 Player", 94, "Quebra 4 Vermelhos - Muito usado"),
         (["B","R","B","R"], "🔵 Player", 90, "Alternância 4"),
         (["Y","B","Y","R"], "🟡 Empate", 92, "🟡🔵🟡🔴 - Misto com 2 empates"),
         (["Y","Y"], "🟡 Empate", 88, "🟡🟡 - 2 Empates Seguidos"),
+        (["Y","Y","Y"], "🔵 Player", 94, "Quebra após 3 Empates"),
     ])
 
-    # 18 padrões que você enviou (mapeados para códigos)
+    # Todos os 18 padrões que você enviou (integrados 100%)
     patterns.extend([
         (["R","R"], "🔴 Casa", 85, "Repetição Simples Vermelho"),
         (["R","R","R"], "🔵 Player", 92, "Repetição Média Vermelho - Quebra"),
@@ -184,13 +191,14 @@ def detect_patterns(history):
         (["R","B","Y","B","R"], "🟡 Empate", 85, "Caos com Empate"),
     ])
 
-    # Customizadas
+    # Customizadas do usuário
     for pat, sug, name in st.session_state.custom_strategies:
         patterns.append((pat, sug, 90, name))
 
     detected = []
     for pat, sug, conf, name in patterns:
-        if len(recent) >= len(pat) and recent[-len(pat):] == pat:  # Olha o final (mais recente)
+        # Olha o FINAL da sequência recente (onde as quebras reais acontecem)
+        if len(recent) >= len(pat) and recent[-len(pat):] == pat:
             b_conf = backtest_pattern(history, pat, sug)
             final_conf = b_conf if b_conf is not None else conf
             detected.append((name, final_conf, sug, pat))
@@ -211,30 +219,23 @@ cols[4].button("🧹 Limpar Tudo", use_container_width=True, on_click=clear)
 
 # HISTÓRICO HORIZONTAL (mais antigo ← → mais recente)
 st.subheader("📊 Histórico (mais antigo ← → mais recente)")
-
 if st.session_state.history:
     display_history = list(reversed(st.session_state.history[:80]))
 
-    history_html = '<div class="history-wrapper"><div class="history-row">'
-    
-    for val in display_history:
-        emoji, cls = color_map[val]
-        history_html += f'<div class="result {cls}">{emoji}</div>'
+    with st.container():
+        st.markdown('<div class="history-wrapper"><div class="history-row">', unsafe_allow_html=True)
+        for val in display_history:
+            emoji, cls = color_map[val]
+            st.markdown(f'<div class="result {cls}">{emoji}</div>', unsafe_allow_html=True)
+        st.markdown('</div></div>', unsafe_allow_html=True)
 
-    history_html += '</div></div>'
-
-    st.markdown(history_html, unsafe_allow_html=True)
-
-    st.caption("← Mais antigo                  Mais recente →")
+    st.caption("← Mais antigo                                                                 Mais recente →")
     st.caption("Sequência lida da esquerda para a direita, como no Green Sinais.")
 
     # Export CSV
-    df_export = pd.DataFrame({
-        "Resultado": [color_to_label.get(r, r) for r in reversed(st.session_state.history)]
-    })
-    csv = df_export.to_csv(index=False).encode("utf-8")
+    df_export = pd.DataFrame({"Resultado": [color_to_label.get(r, r) for r in reversed(st.session_state.history)]})
+    csv = df_export.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Exportar Histórico (CSV)", csv, "historico.csv", "text/csv")
-
 else:
     st.info("Adicione resultados usando os botões acima")
 
@@ -250,7 +251,7 @@ if len(st.session_state.history) >= 3:
         st.metric("Assertividade (backtest no histórico)", f"{confidence:.1f}%")
         st.info(f"**Gales Recomendados**: Até {gale_level} níveis (Martingale). Stop após 2 perdas.")
     else:
-        st.warning("Nenhum padrão forte detectado no momento.")
+        st.warning("Nenhum padrão forte detectado no momento. Tente adicionar mais resultados ou criar estratégias personalizadas.")
 
     stats = get_stats(st.session_state.history)
     cols_stats = st.columns(3)
