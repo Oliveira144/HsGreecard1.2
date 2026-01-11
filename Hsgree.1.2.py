@@ -102,7 +102,11 @@ with st.sidebar:
 
     st.subheader("Crie Estratégias Personalizadas")
     strategy_name = st.text_input("Nome da Estratégia", placeholder="Ex: Quebra 4 Azuis")
-    pattern_str = st.text_input("Sequência do Padrão", placeholder="Ex: B,B,B,B", help="B = 🔵 Player (Home)\nR = 🔴 Casa (Away)\nY = 🟡 Empate\nSepare por vírgula")
+    pattern_str = st.text_input(
+        "Sequência do Padrão",
+        placeholder="Ex: B,B,B,B",
+        help="B = 🔵 Player (Home)\nR = 🔴 Casa (Away)\nY = 🟡 Empate\nSepare por vírgula"
+    )
     suggestion = st.selectbox("Sugestão de Entrada Após o Padrão", ["🔵 Player", "🔴 Casa", "🟡 Empate"])
 
     if st.button("Adicionar Estratégia") and pattern_str:
@@ -159,7 +163,9 @@ def detect_patterns(history):
 
     recent = list(reversed(history[:15]))
 
-    # Padrões com Empate (🟡) - exemplos reais do Green Sinais
+    patterns = []  # ✅ CORREÇÃO CRÍTICA (apenas isso)
+
+    # Padrões com Empate
     patterns.extend([
         (["Y", "B", "Y", "R"], "🟡 Empate", 92, "🟡🔵🟡🔴 - Misto com 2 empates"),
         (["Y", "Y"], "🟡 Empate", 88, "🟡🟡 - 2 Empates Seguidos"),
@@ -191,8 +197,7 @@ def detect_patterns(history):
             detected.append((name, final_conf, sug, pat))
 
     if detected:
-        best = max(detected, key=lambda x: x[1])
-        return best
+        return max(detected, key=lambda x: x[1])
 
     return None, 0, "", None
 
@@ -204,10 +209,9 @@ cols[2].button("🟡 Empate", use_container_width=True, on_click=lambda: add_res
 cols[3].button("↩️ Desfazer", use_container_width=True, on_click=undo)
 cols[4].button("🧹 Limpar Tudo", use_container_width=True, on_click=clear)
 
-# HISTÓRICO - CORRIGIDO PARA HORIZONTAL ÚNICO
-st.subheader("📊 Histórico (mais antigo ← → mais recente)")
+# HISTÓRICO
+st.subheader("📊 Histórico (mais recente → mais antigo)")
 if st.session_state.history:
-    # Inverte para exibição correta (antigo esquerda, recente direita)
     display_history = st.session_state.history[:80]
 
     html = '<div class="history-container">'
@@ -217,12 +221,11 @@ if st.session_state.history:
     html += '</div>'
 
     st.markdown(html, unsafe_allow_html=True)
+    st.caption("← Mais recente                                                                 Mais antigo →")
 
-    # Legenda
-    st.caption("← Mais antigo                                                                 Mais recente →")
-
-    # Export CSV
-    df_export = pd.DataFrame({"Resultado": [color_to_label.get(r, r) for r in reversed(st.session_state.history)]})
+    df_export = pd.DataFrame({
+        "Resultado": [color_to_label.get(r, r) for r in reversed(st.session_state.history)]
+    })
     csv = df_export.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Exportar Histórico (CSV)", csv, "historico.csv", "text/csv")
 else:
@@ -241,22 +244,12 @@ if len(st.session_state.history) >= 3:
         st.info(f"**Gales Recomendados**: Até {gale_level} níveis (Martingale). Stop após 2 perdas.")
     else:
         st.warning("Nenhum padrão forte detectado no momento.")
-
-    stats = get_stats(st.session_state.history)
-    cols_stats = st.columns(3)
-    cols_stats[0].metric("Casa (🔴)", f"{stats['R']} ({stats['R']/stats['total']*100:.1f}%)")
-    cols_stats[1].metric("Player (🔵)", f"{stats['B']} ({stats['B']/stats['total']*100:.1f}%)")
-    cols_stats[2].metric("Empate (🟡)", f"{stats['Y']} ({stats['Y']/stats['total']*100:.1f}%)")
-
-    df_pie = pd.DataFrame({
-        "Cor": ["Casa 🔴", "Player 🔵", "Empate 🟡"],
-        "Quantidade": [stats["R"], stats["B"], stats["Y"]]
-    })
-    chart = alt.Chart(df_pie).mark_arc().encode(theta="Quantidade", color="Cor")
-    st.altair_chart(chart, use_container_width=True)
 else:
     st.info("Adicione pelo menos 3 resultados para ativar a análise completa.")
 
 # Aviso final
 st.markdown("<br><br>", unsafe_allow_html=True)
-st.markdown('<div class="warning-box">Jogue com responsabilidade. Defina stop loss diário e não aposte dinheiro essencial.</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="warning-box">Jogue com responsabilidade. Defina stop loss diário e não aposte dinheiro essencial.</div>',
+    unsafe_allow_html=True
+                        )
