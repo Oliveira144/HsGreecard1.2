@@ -211,23 +211,30 @@ cols[4].button("🧹 Limpar Tudo", use_container_width=True, on_click=clear)
 
 # HISTÓRICO HORIZONTAL (mais antigo ← → mais recente)
 st.subheader("📊 Histórico (mais antigo ← → mais recente)")
+
 if st.session_state.history:
     display_history = list(reversed(st.session_state.history[:80]))
 
-    with st.container():
-        st.markdown('<div class="history-wrapper"><div class="history-row">', unsafe_allow_html=True)
-        for val in display_history:
-            emoji, cls = color_map[val]
-            st.markdown(f'<div class="result {cls}">{emoji}</div>', unsafe_allow_html=True)
-        st.markdown('</div></div>', unsafe_allow_html=True)
+    history_html = '<div class="history-wrapper"><div class="history-row">'
+    
+    for val in display_history:
+        emoji, cls = color_map[val]
+        history_html += f'<div class="result {cls}">{emoji}</div>'
 
-    st.caption("← Mais antigo                                                                 Mais recente →")
+    history_html += '</div></div>'
+
+    st.markdown(history_html, unsafe_allow_html=True)
+
+    st.caption("← Mais antigo                  Mais recente →")
     st.caption("Sequência lida da esquerda para a direita, como no Green Sinais.")
 
     # Export CSV
-    df_export = pd.DataFrame({"Resultado": [color_to_label.get(r, r) for r in reversed(st.session_state.history)]})
-    csv = df_export.to_csv(index=False).encode('utf-8')
+    df_export = pd.DataFrame({
+        "Resultado": [color_to_label.get(r, r) for r in reversed(st.session_state.history)]
+    })
+    csv = df_export.to_csv(index=False).encode("utf-8")
     st.download_button("📥 Exportar Histórico (CSV)", csv, "historico.csv", "text/csv")
+
 else:
     st.info("Adicione resultados usando os botões acima")
 
