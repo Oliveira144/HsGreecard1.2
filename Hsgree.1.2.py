@@ -3,6 +3,7 @@ import pickle
 import os
 import altair as alt
 import pandas as pd
+from datetime import datetime
 
 # Configuração da página
 st.set_page_config(
@@ -31,7 +32,7 @@ if "history" not in st.session_state:
 if "custom_strategies" not in st.session_state:
     st.session_state.custom_strategies = []
 
-# CSS - Histórico horizontal e estilo geral
+# CSS - Histórico horizontal reforçado (uma linha única)
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
@@ -42,54 +43,48 @@ body { background: radial-gradient(circle at top, #0f2027, #203a43, #2c5364); }
 .title { font-size: 52px; font-weight: 800; color: #ffffff; text-align: center; letter-spacing: 2px; }
 .subtitle { font-size: 20px; text-align: center; color: #d0d0d0; }
 
-.history-container {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 8px;
-    padding: 12px;
+.history-wrapper {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    padding: 10px 0;
     background: rgba(255,255,255,0.06);
     border-radius: 16px;
     margin: 12px 0;
-    scrollbar-width: thin;
 }
 
-.history-container::-webkit-scrollbar { height: 8px; }
-.history-container::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+.history-row {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 8px;
+}
 
 .result {
-    flex: 0 0 auto;
+    display: inline-block;
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    line-height: 40px;
+    text-align: center;
     font-size: 20px;
     font-weight: bold;
     color: white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    margin: 0 2px;
+    vertical-align: middle;
+    flex-shrink: 0;
 }
 
 .red { background: linear-gradient(145deg, #ff1e1e, #b30000); }
 .blue { background: linear-gradient(145deg, #1e90ff, #003d80); }
 .yellow { background: linear-gradient(145deg, #ffcc00, #cc9a00); color: #000; }
 
-.warning-box {
-    background: rgba(255,68,68,0.15);
-    border: 1px solid #ff4444;
-    border-radius: 12px;
-    padding: 16px;
-    margin: 20px 0;
-    color: #ffdddd;
-}
+.warning-box { background: rgba(255,68,68,0.15); border: 1px solid #ff4444; border-radius: 12px; padding: 16px; margin: 20px 0; color: #ffdddd; }
 </style>
 """, unsafe_allow_html=True)
 
 # Cabeçalho
 st.markdown('<div class="title">🃏 Football Studio AI Pro</div>', unsafe_allow_html=True)
-st.markdown('<div class="subtitle">Análise Inteligente • Padrões Reais 2026 • Sugestões</div>', unsafe_allow_html=True)
+st.markdown('<div class="subtitle">Análise Inteligente • Padrões Reais 2026 • Sugestões Avançadas</div>', unsafe_allow_html=True)
 
 st.warning("⚠️ **AVISO**: Apostas envolvem risco financeiro alto. Jogue apenas com dinheiro que pode perder. Proibido para menores de 18 anos.")
 
@@ -98,23 +93,19 @@ with st.sidebar:
     st.header("Configurações Profissionais")
     
     gale_level = st.slider("Nível máximo de Gales (Martingale)", min_value=0, max_value=3, value=1, step=1)
-    st.info(f"Gales sugeridos: 0 a {gale_level} níveis (ex: 1x → 2x → 4x). Stop após 2 perdas recomendado.")
+    st.info(f"Gales sugeridos: 0 a {gale_level} níveis. Stop após 2 perdas recomendado.")
 
     st.subheader("Crie Estratégias Personalizadas")
     strategy_name = st.text_input("Nome da Estratégia", placeholder="Ex: Quebra 4 Azuis")
-    pattern_str = st.text_input(
-        "Sequência do Padrão",
-        placeholder="Ex: B,B,B,B",
-        help="B = 🔵 Player (Home)\nR = 🔴 Casa (Away)\nY = 🟡 Empate\nSepare por vírgula"
-    )
+    pattern_str = st.text_input("Sequência do Padrão", placeholder="Ex: B,B,B,B", help="B = 🔵 Player\nR = 🔴 Casa\nY = 🟡 Empate\nSepare por vírgula")
     suggestion = st.selectbox("Sugestão de Entrada Após o Padrão", ["🔵 Player", "🔴 Casa", "🟡 Empate"])
 
     if st.button("Adicionar Estratégia") and pattern_str:
         pattern_list = [p.strip().upper() for p in pattern_str.split(",")]
-        st.session_state.custom_strategies.append((pattern_list, suggestion, strategy_name or "Estratégia Custom"))
+        st.session_state.custom_strategies.append((pattern_list, suggestion, strategy_name or "Custom"))
         if len(st.session_state.custom_strategies) > 5:
             st.session_state.custom_strategies = st.session_state.custom_strategies[-5:]
-        st.success("Estratégia adicionada! Agora o app detecta ela automaticamente.")
+        st.success("Estratégia adicionada!")
 
     st.markdown("**Estratégias Ativas:**")
     for pat, sug, name in st.session_state.custom_strategies:
@@ -123,7 +114,7 @@ with st.sidebar:
 # FUNÇÕES AUXILIARES
 def add_result(value):
     st.session_state.history.insert(0, value)
-    st.session_state.history = st.session_state.history[:300]
+    st.session_state.history = st.session_state.history[:500]  # Aumentado para mais análise
     save_history(st.session_state.history)
 
 def undo():
@@ -154,35 +145,43 @@ def backtest_pattern(history, pattern, suggestion):
             total += 1
             if i + len(pattern) < len(history) and history[i + len(pattern)] == sug_code:
                 hits += 1
-    return (hits / total *100) if total > 0 else None
+    return (hits / total * 100) if total > 0 else None
 
-# DETECÇÃO DE PADRÕES
+# DETECÇÃO DE PADRÕES AVANÇADA (todos os 18 + Green Sinais + imagens)
 def detect_patterns(history):
     if len(history) < 3:
         return None, 0, "", None
 
-    recent = list(reversed(history[:15]))
+    recent = history[:20]  # Aumentado para capturar padrões longos
+    patterns = []
 
-    patterns = []  # ✅ CORREÇÃO CRÍTICA (apenas isso)
-
-    # Padrões com Empate
+    # Padrões do Green Sinais (oficiais)
     patterns.extend([
-        (["Y", "B", "Y", "R"], "🟡 Empate", 92, "🟡🔵🟡🔴 - Misto com 2 empates"),
-        (["Y", "Y"], "🟡 Empate", 88, "🟡🟡 - 2 Empates Seguidos"),
-        (["Y", "Y", "Y"], "🔵 Player", 94, "🟡🟡🟡 - Quebra após 3 Empates"),
-        (["B", "Y", "R"], "🟡 Empate", 87, "🔵🟡🔴 - Empate no meio"),
-        (["B", "B", "Y"], "🔵 Player", 90, "🔵🔵🟡 - Streak + Empate"),
-        (["R", "Y", "B"], "🔵 Player", 89, "🔴🟡🔵 - Empate após Vermelho"),
+        (["B"]*4, "🔴 Casa", 94, "Quebra 4 Azuis - Muito usado"),
+        (["R"]*4, "🔵 Player", 94, "Quebra 4 Vermelhos - Muito usado"),
+        (["B","R","B","R"], "🔵 Player", 90, "Alternância 4"),
+        (["Y","B","Y","R"], "🟡 Empate", 92, "🟡🔵🟡🔴 - Misto com 2 empates"),
+        (["Y","Y"], "🟡 Empate", 88, "🟡🟡 - 2 Empates Seguidos"),
     ])
 
-    # Outros padrões clássicos
+    # 18 padrões que você enviou (mapeados para códigos)
     patterns.extend([
-        (["B"]*3, "🔴 Casa", 92, "Quebra 3 Azuis"),
-        (["B"]*4, "🔴 Casa", 94, "Quebra 4 Azuis"),
-        (["R"]*3, "🔵 Player", 92, "Quebra 3 Vermelhos"),
-        (["R"]*4, "🔵 Player", 94, "Quebra 4 Vermelhos"),
-        (["B","R","B","R"], "🔵 Player", 90, "Alternância 4"),
-        (["Y","Y"], "🟡 Empate", 85, "2 Empates Seguidos"),
+        (["R","R"], "🔴 Casa", 85, "Repetição Simples Vermelho"),
+        (["R","R","R"], "🔵 Player", 92, "Repetição Média Vermelho - Quebra"),
+        (["R","R","R","R","R"], "🔵 Player", 96, "Repetição Longa - Manipulada"),
+        (["R","B","R","B"], "🔴 Casa", 90, "Alternância Simples"),
+        (["R","B","R","B","R","B"], "🔴 Casa", 88, "Alternância Longa"),
+        (["R","R","B","B"], "🔴 Casa", 90, "Bloco 2x2"),
+        (["R","R","R","B","B","B"], "🔴 Casa", 89, "Bloco 3x3"),
+        (["R","R","B","R","R","B"], "🔴 Casa", 90, "Bloco Camuflado"),
+        (["Y","R","R","B"], "🔵 Player", 87, "Empate Isolado"),
+        (["R","R","Y","R","R"], "🔴 Casa", 89, "Empate Âncora"),
+        (["R","R","R","Y","B"], "🔵 Player", 92, "Empate de Quebra"),
+        (["R","R","Y","B","R"], "🔴 Casa", 85, "Empate Antecipatório"),
+        (["R","Y","B","Y","R"], "🟡 Empate", 80, "Empate Intercalado"),
+        (["Y","Y"], "🟡 Empate", 85, "Empate Duplo"),
+        (["R","R","Y","B","B"], "🔵 Player", 90, "Bloco com Empate Central"),
+        (["R","B","Y","B","R"], "🟡 Empate", 85, "Caos com Empate"),
     ])
 
     # Customizadas
@@ -191,13 +190,14 @@ def detect_patterns(history):
 
     detected = []
     for pat, sug, conf, name in patterns:
-        if len(recent) >= len(pat) and recent[:len(pat)] == pat:
+        if len(recent) >= len(pat) and recent[-len(pat):] == pat:  # Olha o final (mais recente)
             b_conf = backtest_pattern(history, pat, sug)
             final_conf = b_conf if b_conf is not None else conf
             detected.append((name, final_conf, sug, pat))
 
     if detected:
-        return max(detected, key=lambda x: x[1])
+        best = max(detected, key=lambda x: x[1])
+        return best
 
     return None, 0, "", None
 
@@ -209,23 +209,23 @@ cols[2].button("🟡 Empate", use_container_width=True, on_click=lambda: add_res
 cols[3].button("↩️ Desfazer", use_container_width=True, on_click=undo)
 cols[4].button("🧹 Limpar Tudo", use_container_width=True, on_click=clear)
 
-# HISTÓRICO
-st.subheader("📊 Histórico (mais recente → mais antigo)")
+# HISTÓRICO HORIZONTAL (mais antigo ← → mais recente)
+st.subheader("📊 Histórico (mais antigo ← → mais recente)")
 if st.session_state.history:
-    display_history = st.session_state.history[:80]
+    display_history = list(reversed(st.session_state.history[:80]))
 
-    html = '<div class="history-container">'
-    for val in display_history:
-        emoji, cls = color_map[val]
-        html += f'<div class="result {cls}">{emoji}</div>'
-    html += '</div>'
+    with st.container():
+        st.markdown('<div class="history-wrapper"><div class="history-row">', unsafe_allow_html=True)
+        for val in display_history:
+            emoji, cls = color_map[val]
+            st.markdown(f'<div class="result {cls}">{emoji}</div>', unsafe_allow_html=True)
+        st.markdown('</div></div>', unsafe_allow_html=True)
 
-    st.markdown(html, unsafe_allow_html=True)
-    st.caption("← Mais recente                                                                 Mais antigo →")
+    st.caption("← Mais antigo                                                                 Mais recente →")
+    st.caption("Sequência lida da esquerda para a direita, como no Green Sinais.")
 
-    df_export = pd.DataFrame({
-        "Resultado": [color_to_label.get(r, r) for r in reversed(st.session_state.history)]
-    })
+    # Export CSV
+    df_export = pd.DataFrame({"Resultado": [color_to_label.get(r, r) for r in reversed(st.session_state.history)]})
     csv = df_export.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Exportar Histórico (CSV)", csv, "historico.csv", "text/csv")
 else:
@@ -244,12 +244,22 @@ if len(st.session_state.history) >= 3:
         st.info(f"**Gales Recomendados**: Até {gale_level} níveis (Martingale). Stop após 2 perdas.")
     else:
         st.warning("Nenhum padrão forte detectado no momento.")
+
+    stats = get_stats(st.session_state.history)
+    cols_stats = st.columns(3)
+    cols_stats[0].metric("Casa (🔴)", f"{stats['R']} ({stats['R']/stats['total']*100:.1f}%)")
+    cols_stats[1].metric("Player (🔵)", f"{stats['B']} ({stats['B']/stats['total']*100:.1f}%)")
+    cols_stats[2].metric("Empate (🟡)", f"{stats['Y']} ({stats['Y']/stats['total']*100:.1f}%)")
+
+    df_pie = pd.DataFrame({
+        "Cor": ["Casa 🔴", "Player 🔵", "Empate 🟡"],
+        "Quantidade": [stats["R"], stats["B"], stats["Y"]]
+    })
+    chart = alt.Chart(df_pie).mark_arc().encode(theta="Quantidade", color="Cor")
+    st.altair_chart(chart, use_container_width=True)
 else:
     st.info("Adicione pelo menos 3 resultados para ativar a análise completa.")
 
 # Aviso final
 st.markdown("<br><br>", unsafe_allow_html=True)
-st.markdown(
-    '<div class="warning-box">Jogue com responsabilidade. Defina stop loss diário e não aposte dinheiro essencial.</div>',
-    unsafe_allow_html=True
-                        )
+st.markdown('<div class="warning-box">Jogue com responsabilidade. Defina stop loss diário e não aposte dinheiro essencial.</div>', unsafe_allow_html=True)
