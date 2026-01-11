@@ -157,8 +157,7 @@ def detect_patterns(history):
     if len(history) < 3:
         return None, 0, "", None
 
-    recent = history[:15]  # As mais recentes (índice 0 = mais novo)
-    patterns = []
+    recent = list(reversed(history[:15]))
 
     # Padrões com Empate (🟡) - exemplos reais do Green Sinais
     patterns.extend([
@@ -209,7 +208,7 @@ cols[4].button("🧹 Limpar Tudo", use_container_width=True, on_click=clear)
 st.subheader("📊 Histórico (mais antigo ← → mais recente)")
 if st.session_state.history:
     # Inverte para exibição correta (antigo esquerda, recente direita)
-    display_history = list(reversed(st.session_state.history[:80]))
+    display_history = st.session_state.history[:80]
 
     html = '<div class="history-container">'
     for val in display_history:
